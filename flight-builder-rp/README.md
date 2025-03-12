@@ -1,0 +1,1 @@
+Adds support for GPIO pins on the Raspberry Pi

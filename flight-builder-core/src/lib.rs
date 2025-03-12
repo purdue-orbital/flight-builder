@@ -1,8 +1,12 @@
 #![no_std]
 
 extern crate core;
+extern crate alloc;
 
-
+use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::cell::{Ref, RefCell, RefMut};
 use core::marker::PhantomData;

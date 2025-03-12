@@ -1,0 +1,7 @@
+[package]
+name = "flight-builder-rp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+flight-builder-core = { path = "../flight-builder-core" }
