@@ -37,7 +37,7 @@ pub trait Task {
 
 pub type StoredTask = Box<dyn Task>;
 
-trait IntoTask<Input>{
+pub trait IntoTask<Input>{
     type Task: Task;
     fn into_task(self) -> Self::Task;
 }
@@ -169,6 +169,12 @@ pub struct Scheduler {
     resources: Option<BTreeMap<TypeId, RefCell<Box<dyn Any>>>>,
 }
 
+impl Default for Scheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scheduler {
     pub fn new() -> Self {
         Scheduler{
@@ -178,7 +184,7 @@ impl Scheduler {
         }
     }
 
-    pub fn add_task<I, S: Task + 'static>(&mut self, schedule: Schedule, task: impl IntoTask<I, Task = S>) {
+    pub fn add_task<I, S: Task + 'static>(&mut self, schedule: Schedule, task: impl IntoTask<I, Task = S>)  {
         match schedule {
             Schedule::Startup => {
                 self.startup_tasks.push(Box::new(task.into_task()));
@@ -207,8 +213,6 @@ impl Scheduler {
             resources: self.resources.take().unwrap(),
         }
     }
-
-
 }
 
 pub struct TaskRunner{

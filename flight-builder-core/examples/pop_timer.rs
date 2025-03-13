@@ -35,7 +35,7 @@ fn pop(){
 }
 
 fn main() {
-    let mut s = Scheduler::new();
+    let mut s = Scheduler::default();
 
     // Add pop timer resource
     s.add_resource(PopTimer{counter:0});
