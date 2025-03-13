@@ -23,7 +23,6 @@ fn main() {
     
     s.add_resource(PopTimer{counter:0});
     s.add_task(Schedule::Update(1.0), pop_check);
-    s.setup();
     
-    s.run()
+    s.build().run();
 }

@@ -31,18 +31,18 @@ impl Schedule {
     
 }
 
-pub trait Stage {
+pub trait Task {
     fn invoke(&mut self, args: &mut BTreeMap<TypeId, RefCell<Box<dyn Any>>>);
 }
 
-pub type StoredStage = Box<dyn Stage>;
+pub type StoredTask = Box<dyn Task>;
 
-trait IntoStage<Input>{
-    type Stage: Stage;
-    fn into_stage(self) -> Self::Stage;
+trait IntoTask<Input>{
+    type Task: Task;
+    fn into_task(self) -> Self::Task;
 }
 
-trait StageParam {
+trait TaskParam {
     type Item<'new>;
     fn retrieve<'r>(resources: &'r BTreeMap<TypeId, RefCell<Box<dyn Any>>>) -> Self::Item<'r>;
 }
@@ -79,7 +79,7 @@ impl<T> DerefMut for ResMut<'_, T> {
     }
 }
 
-impl<'res, T: 'static> StageParam for Res<'res, T> {
+impl<'res, T: 'static> TaskParam for Res<'res, T> {
     type Item<'new> = Res<'new, T>;
 
     fn retrieve<'r>(resources: &'r BTreeMap<TypeId, RefCell<Box<dyn Any>>>) -> Self::Item<'r> {
@@ -87,7 +87,7 @@ impl<'res, T: 'static> StageParam for Res<'res, T> {
     }
 }
 
-impl<'res, T: 'static> StageParam for ResMut<'res, T> {
+impl<'res, T: 'static> TaskParam for ResMut<'res, T> {
     type Item<'new> = ResMut<'new, T>;
 
     fn retrieve<'r>(resources: &'r BTreeMap<TypeId,RefCell<Box<(dyn Any + 'static)>>>) -> Self::Item<'r> {
@@ -98,15 +98,15 @@ impl<'res, T: 'static> StageParam for ResMut<'res, T> {
     }
 }
 
-macro_rules! impl_stage {
+macro_rules! impl_task {
     ($($params:ident),*) => {
         #[allow(unused_variables)]
         #[allow(non_snake_case)]
-        impl<F: FnMut($($params),*), $($params: StageParam),*> Stage for FunctionStage<($($params),*), F>
+        impl<F: FnMut($($params),*), $($params: TaskParam),*> Task for FunctionTask<($($params),*), F>
         where
             for<'a, 'b> &'a mut F:
                 FnMut($($params),*) +
-                FnMut($(<$params as StageParam>::Item<'b>),*)
+                FnMut($(<$params as TaskParam>::Item<'b>),*)
         {
             fn invoke(&mut self, resources: &mut BTreeMap<TypeId, RefCell<Box<dyn Any>>>) {
                 fn call_inner<$($params),*>(
@@ -126,16 +126,16 @@ macro_rules! impl_stage {
             }
         }
 
-        impl<F: FnMut($($params),*), $($params: StageParam),*> IntoStage<($($params,)*)> for F
+        impl<F: FnMut($($params),*), $($params: TaskParam),*> IntoTask<($($params,)*)> for F
         where
             for<'a, 'b> &'a mut F:
                 FnMut($($params),*) +
-                FnMut($(<$params as StageParam>::Item<'b>),*)
+                FnMut($(<$params as TaskParam>::Item<'b>),*)
         {
-            type Stage = FunctionStage<($($params),*), Self>;
+            type Task = FunctionTask<($($params),*), Self>;
 
-            fn into_stage(self) -> Self::Stage {
-                FunctionStage{
+            fn into_task(self) -> Self::Task {
+                FunctionTask{
                     f: self,
                     marker: Default::default(),
                 }
@@ -144,47 +144,47 @@ macro_rules! impl_stage {
     };
 }
 
-impl_stage!();
-impl_stage!(A);
-impl_stage!(A, B);
-impl_stage!(A, B, C);
-impl_stage!(A, B, C, D);
-impl_stage!(A, B, C, D, E);
-impl_stage!(A, B, C, D, E, G);
-impl_stage!(A, B, C, D, E, G, H);
-impl_stage!(A, B, C, D, E, G, H, I);
-impl_stage!(A, B, C, D, E, G, H, I, J);
-impl_stage!(A, B, C, D, E, G, H, I, J, K);
-impl_stage!(A, B, C, D, E, G, H, I, J, K, L);
-impl_stage!(A, B, C, D, E, G, H, I, J, K, L, M);
-impl_stage!(A, B, C, D, E, G, H, I, J, K, L, M, N);
-impl_stage!(A, B, C, D, E, G, H, I, J, K, L, M, N, O);
-impl_stage!(A, B, C, D, E, G, H, I, J, K, L, M, N, O, P);
-impl_stage!(A, B, C, D, E, G, H, I, J, K, L, M, N, O, P, R);
+impl_task!();
+impl_task!(A);
+impl_task!(A, B);
+impl_task!(A, B, C);
+impl_task!(A, B, C, D);
+impl_task!(A, B, C, D, E);
+impl_task!(A, B, C, D, E, G);
+impl_task!(A, B, C, D, E, G, H);
+impl_task!(A, B, C, D, E, G, H, I);
+impl_task!(A, B, C, D, E, G, H, I, J);
+impl_task!(A, B, C, D, E, G, H, I, J, K);
+impl_task!(A, B, C, D, E, G, H, I, J, K, L);
+impl_task!(A, B, C, D, E, G, H, I, J, K, L, M);
+impl_task!(A, B, C, D, E, G, H, I, J, K, L, M, N);
+impl_task!(A, B, C, D, E, G, H, I, J, K, L, M, N, O);
+impl_task!(A, B, C, D, E, G, H, I, J, K, L, M, N, O, P);
+impl_task!(A, B, C, D, E, G, H, I, J, K, L, M, N, O, P, R);
 
 pub struct Scheduler {
-    startup_stages: Vec<StoredStage>,
-    update_stages: Vec<(u128,u128,StoredStage)>,
+    startup_tasks: Vec<StoredTask>,
+    update_tasks: Option<Vec<(u128,u128,StoredTask)>>,
 
-    resources: BTreeMap<TypeId, RefCell<Box<dyn Any>>>,
+    resources: Option<BTreeMap<TypeId, RefCell<Box<dyn Any>>>>,
 }
 
 impl Scheduler {
     pub fn new() -> Self {
         Scheduler{
-            startup_stages: vec![],
-            update_stages: vec![],
-            resources: BTreeMap::new(),
+            startup_tasks: vec![],
+            update_tasks: Some(vec![]),
+            resources: Some(BTreeMap::new()),
         }
     }
 
-    pub fn add_task<I, S: Stage + 'static>(&mut self, schedule: Schedule, stage: impl IntoStage<I, Stage = S>) {
+    pub fn add_task<I, S: Task + 'static>(&mut self, schedule: Schedule, task: impl IntoTask<I, Task = S>) {
         match schedule {
             Schedule::Startup => {
-                self.startup_stages.push(Box::new(stage.into_stage()));
+                self.startup_tasks.push(Box::new(task.into_task()));
             }
             Schedule::Update(x) => {
-                self.update_stages.push((0,(x * 1000.0) as u128,Box::new(stage.into_stage())));
+                self.update_tasks.as_mut().expect("Task Runner Already Made").push((0,(x * 1000.0) as u128,Box::new(task.into_task())));
             }
         }
     }
@@ -194,30 +194,45 @@ impl Scheduler {
     }
 
     pub fn add_resource<R: 'static>(&mut self, resource: R) {
-        self.resources.insert(TypeId::of::<R>(), RefCell::new(Box::new(resource)));
+        self.resources.as_mut().expect("Task Runner Already Made").insert(TypeId::of::<R>(), RefCell::new(Box::new(resource)));
     }
 
-    pub fn setup(&mut self) {
-        for stage in self.startup_stages.iter_mut() {
-            stage.invoke(&mut self.resources);
+    pub fn build(&mut self) -> TaskRunner{
+        for task in self.startup_tasks.iter_mut() {
+            task.invoke(self.resources.as_mut().unwrap());
+        }
+        
+        TaskRunner{
+            tasks: self.update_tasks.take().unwrap(),
+            resources: self.resources.take().unwrap(),
         }
     }
 
+
+}
+
+pub struct TaskRunner{
+    tasks: Vec<(u128,u128,StoredTask)>,
+
+    resources: BTreeMap<TypeId, RefCell<Box<dyn Any>>>,
+}
+
+impl TaskRunner {
     pub fn run(&mut self) {
         loop {
             let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-            for stage in self.update_stages.iter_mut() {
-                if t - stage.0 > stage.1 {
-                    stage.2.invoke(&mut self.resources);
-                    
-                    stage.0 = t;
+            for task in self.tasks.iter_mut() {
+                if t - task.0 > task.1 {
+                    task.2.invoke(&mut self.resources);
+
+                    task.0 = t;
                 }
             }
         }
     }
 }
 
-pub struct FunctionStage<Input, F>{
+pub struct FunctionTask<Input, F>{
     f: F,
     marker: PhantomData<fn() -> Input>,
 }
