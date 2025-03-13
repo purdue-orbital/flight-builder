@@ -1,4 +1,4 @@
-#![no_std]
+//#![no_std]
 
 extern crate core;
 extern crate alloc;
@@ -11,11 +11,24 @@ use core::any::{Any, TypeId};
 use core::cell::{Ref, RefCell, RefMut};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Schedule{
     Startup,
-    Update,
+    
+    /// How often to run this task in seconds
+    Update(f32),
+}
+
+impl Schedule {
+    pub fn get_time(&self) -> f32 {
+        match self {
+            Schedule::Startup => 0.0,
+            Schedule::Update(time) => *time,
+        }
+    }
+    
 }
 
 pub trait Stage {
@@ -151,7 +164,7 @@ impl_stage!(A, B, C, D, E, G, H, I, J, K, L, M, N, O, P, R);
 
 pub struct Scheduler {
     startup_stages: Vec<StoredStage>,
-    update_stages: Vec<StoredStage>,
+    update_stages: Vec<(u128,u128,StoredStage)>,
 
     resources: BTreeMap<TypeId, RefCell<Box<dyn Any>>>,
 }
@@ -165,13 +178,13 @@ impl Scheduler {
         }
     }
 
-    pub fn add_stage<I, S: Stage + 'static>(&mut self, schedule: Schedule, stage: impl IntoStage<I, Stage = S>) {
+    pub fn add_task<I, S: Stage + 'static>(&mut self, schedule: Schedule, stage: impl IntoStage<I, Stage = S>) {
         match schedule {
             Schedule::Startup => {
                 self.startup_stages.push(Box::new(stage.into_stage()));
             }
-            Schedule::Update => {
-                self.update_stages.push(Box::new(stage.into_stage()));
+            Schedule::Update(x) => {
+                self.update_stages.push((0,(x * 1000.0) as u128,Box::new(stage.into_stage())));
             }
         }
     }
@@ -191,8 +204,15 @@ impl Scheduler {
     }
 
     pub fn run(&mut self) {
-        for stage in self.update_stages.iter_mut() {
-            stage.invoke(&mut self.resources);
+        loop {
+            let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+            for stage in self.update_stages.iter_mut() {
+                if t - stage.0 > stage.1 {
+                    stage.2.invoke(&mut self.resources);
+                    
+                    stage.0 = t;
+                }
+            }
         }
     }
 }
