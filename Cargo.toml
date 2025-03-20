@@ -2,5 +2,4 @@
 resolver = "2"
 members = [
     "flight-builder-core",
-    "flight-builder-rp",
 ]

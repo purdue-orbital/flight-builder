@@ -1,0 +1,22 @@
+name: Crate Test
+
+on:
+  push:
+    branches:
+      - "*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: test
+        run: cargo +nightly test --verbose
