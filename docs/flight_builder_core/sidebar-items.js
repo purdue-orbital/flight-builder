@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Schedule"],"struct":["FunctionTask","Res","ResMut","Scheduler","TaskRunner"],"trait":["IntoTask","Task"],"type":["StoredTask"]};
