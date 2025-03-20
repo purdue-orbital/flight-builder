@@ -22,6 +22,12 @@ pub enum Schedule {
 }
 
 impl Schedule {
+    /// Returns the time associated with the schedule.
+    ///
+    /// # Returns
+    ///
+    /// * `0.0` if the schedule is for startup.
+    /// * The update interval in seconds if the schedule is for periodic updates.
     pub fn get_time(&self) -> f32 {
         match self {
             Schedule::Startup => 0.0,
