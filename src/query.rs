@@ -1,5 +1,5 @@
-use core::any::{Any, TypeId};
-use core::cell::{Ref, RefCell, RefMut};
+use core::any::Any;
+use core::cell::{Ref, RefMut};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 

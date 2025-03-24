@@ -2,9 +2,8 @@ use super::query::*;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use core::any::{Any, TypeId};
-use core::cell::{Ref, RefCell, RefMut};
+use core::cell::RefCell;
 use core::marker::PhantomData;
-use core::ops::{Deref, DerefMut};
 
 pub trait Task {
     fn invoke(&mut self, args: &mut BTreeMap<TypeId, RefCell<Box<dyn Any>>>);

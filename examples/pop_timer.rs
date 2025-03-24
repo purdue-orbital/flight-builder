@@ -1,4 +1,4 @@
-use flight_builder_core::prelude::*;
+use flight_builder::prelude::*;
 use rand::random;
 
 pub struct PopTimer {

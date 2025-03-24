@@ -4,9 +4,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
-use core::cell::{Ref, RefCell, RefMut};
-use core::marker::PhantomData;
-use core::ops::{Deref, DerefMut};
+use core::cell::RefCell;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Copy, Clone, PartialEq)]
