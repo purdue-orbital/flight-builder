@@ -1,11 +1,16 @@
+use super::clock::*;
+use super::states::*;
 use super::tasks::*;
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
-use std::time::{SystemTime, UNIX_EPOCH};
+use embedded_time::Clock;
+use embedded_time::Instant;
+use embedded_time::duration::Generic;
+use embedded_time::duration::Milliseconds;
+use hashbrown::HashMap;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Schedule {
@@ -32,9 +37,11 @@ impl Schedule {
 
 pub struct Scheduler {
     startup_tasks: Vec<StoredTask>,
-    update_tasks: Option<Vec<(u128, u128, StoredTask)>>,
+    update_tasks: Option<Vec<(Milliseconds<u64>, Milliseconds<u64>, StoredTask)>>,
 
-    resources: Option<BTreeMap<TypeId, RefCell<Box<dyn Any>>>>,
+    states: Option<Vec<StoredState>>,
+
+    resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>>>,
 }
 
 impl Default for Scheduler {
@@ -47,8 +54,9 @@ impl Scheduler {
     pub fn new() -> Self {
         Scheduler {
             startup_tasks: vec![],
+            states: Some(vec![]),
             update_tasks: Some(vec![]),
-            resources: Some(BTreeMap::new()),
+            resources: Some(HashMap::new()),
         }
     }
 
@@ -68,7 +76,11 @@ impl Scheduler {
                 self.update_tasks
                     .as_mut()
                     .expect("Task Runner Already Made")
-                    .push((0, (x * 1000.0) as u128, Box::new(task.into_task())));
+                    .push((
+                        Milliseconds::new(0),
+                        Milliseconds::new((x * 1000.0) as u64),
+                        Box::new(task.into_task()),
+                    ));
             }
         }
     }
@@ -94,6 +106,15 @@ impl Scheduler {
             .insert(TypeId::of::<R>(), RefCell::new(Box::new(resource)));
     }
 
+    pub fn add_state<S: 'static + States>(&mut self, state: S) {
+        self.add_resource(NextState::<S>::Unchanged);
+        self.add_resource(State(state));
+    }
+
+    pub fn init_state<S: 'static + States + Default>(&mut self) {
+        self.add_state(S::default());
+    }
+
     /// Builds a `TaskRunner` from the scheduler by invoking all startup tasks and preparing update tasks.
     ///
     /// # Parameters
@@ -116,9 +137,9 @@ impl Scheduler {
 }
 
 pub struct TaskRunner {
-    tasks: Vec<(u128, u128, StoredTask)>,
+    tasks: Vec<(Milliseconds<u64>, Milliseconds<u64>, StoredTask)>,
 
-    resources: BTreeMap<TypeId, RefCell<Box<dyn Any>>>,
+    resources: HashMap<TypeId, RefCell<Box<dyn Any>>>,
 }
 
 impl TaskRunner {
@@ -129,11 +150,12 @@ impl TaskRunner {
     /// - For each task, it checks if the elapsed time since the last execution is greater than the task's specified interval.
     /// - If the condition is met, it invokes the task with the available resources and updates the last executed time to the current time.
     pub fn run(&mut self) {
+        let clock = SystemClock::default();
+        let start = clock.try_now().expect("Error getting start time");
         loop {
-            let t = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis();
+            let t = (clock.try_now().expect("Error getting current time") - start)
+                .try_into()
+                .expect("Failed to convert time");
             for task in self.tasks.iter_mut() {
                 if t - task.0 > task.1 {
                     task.2.invoke(&mut self.resources);

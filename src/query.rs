@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use core::any::Any;
 use core::cell::{Ref, RefMut};
 use core::marker::PhantomData;
