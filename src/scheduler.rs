@@ -8,11 +8,9 @@ use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use embedded_time::Clock;
 use embedded_time::Instant;
-use embedded_time::duration::Generic;
 use embedded_time::duration::Milliseconds;
 use hashbrown::HashMap;
 
-#[derive(Copy, Clone, PartialEq)]
 pub enum Schedule {
     Startup,
 
@@ -20,26 +18,9 @@ pub enum Schedule {
     Update(f32),
 }
 
-impl Schedule {
-    /// Returns the time associated with the schedule.
-    ///
-    /// # Returns
-    ///
-    /// * `0.0` if the schedule is for startup.
-    /// * The update interval in seconds if the schedule is for periodic updates.
-    pub fn get_time(&self) -> f32 {
-        match self {
-            Schedule::Startup => 0.0,
-            Schedule::Update(time) => *time,
-        }
-    }
-}
-
 pub struct Scheduler {
     startup_tasks: Vec<StoredTask>,
     update_tasks: Option<Vec<(Milliseconds<u64>, Milliseconds<u64>, StoredTask)>>,
-
-    states: Option<Vec<StoredState>>,
 
     resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>>>,
 }
@@ -54,7 +35,6 @@ impl Scheduler {
     pub fn new() -> Self {
         Scheduler {
             startup_tasks: vec![],
-            states: Some(vec![]),
             update_tasks: Some(vec![]),
             resources: Some(HashMap::new()),
         }
@@ -129,17 +109,24 @@ impl Scheduler {
             task.invoke(self.resources.as_mut().unwrap());
         }
 
+        let clock = SystemClock::default();
+
         TaskRunner {
             tasks: self.update_tasks.take().unwrap(),
             resources: self.resources.take().unwrap(),
+
+            start_timestamp: clock.try_now().expect("Error can't start timestamp"),
+            clock,
         }
     }
 }
 
 pub struct TaskRunner {
     tasks: Vec<(Milliseconds<u64>, Milliseconds<u64>, StoredTask)>,
-
     resources: HashMap<TypeId, RefCell<Box<dyn Any>>>,
+
+    clock: SystemClock,
+    start_timestamp: Instant<SystemClock>,
 }
 
 impl TaskRunner {
@@ -150,18 +137,21 @@ impl TaskRunner {
     /// - For each task, it checks if the elapsed time since the last execution is greater than the task's specified interval.
     /// - If the condition is met, it invokes the task with the available resources and updates the last executed time to the current time.
     pub fn run(&mut self) {
-        let clock = SystemClock::default();
-        let start = clock.try_now().expect("Error getting start time");
         loop {
-            let t = (clock.try_now().expect("Error getting current time") - start)
-                .try_into()
-                .expect("Failed to convert time");
-            for task in self.tasks.iter_mut() {
-                if t - task.0 > task.1 {
-                    task.2.invoke(&mut self.resources);
+            self.run_once();
+        }
+    }
 
-                    task.0 = t;
-                }
+    pub fn run_once(&mut self) {
+        let t = (self.clock.try_now().expect("Error getting current time") - self.start_timestamp)
+            .try_into()
+            .expect("Failed to convert time");
+
+        for task in self.tasks.iter_mut() {
+            if t - task.0 > task.1 {
+                task.2.invoke(&mut self.resources);
+
+                task.0 = t;
             }
         }
     }

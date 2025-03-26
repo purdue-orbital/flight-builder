@@ -23,7 +23,7 @@ impl<S: States> State<S> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Eq)]
 pub enum NextState<S: States> {
     #[default]
     Unchanged,
@@ -40,7 +40,7 @@ impl<S: States> NextState<S> {
         *self = Self::Unchanged;
     }
 
-    pub(crate) fn take_next_state(&mut self) -> Option<S> {
+    pub fn take_next_state(&mut self) -> Option<S> {
         match core::mem::take(self) {
             Self::Pending(x) => Some(x),
 

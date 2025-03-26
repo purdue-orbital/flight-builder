@@ -1,4 +1,3 @@
-use core::cell::OnceCell;
 use embedded_time::Clock;
 
 #[cfg(feature = "std")]
