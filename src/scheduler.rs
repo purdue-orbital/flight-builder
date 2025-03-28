@@ -8,7 +8,7 @@ use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use embedded_time::Clock;
 use embedded_time::Instant;
-use embedded_time::duration::Milliseconds;
+use embedded_time::duration::Microseconds;
 use hashbrown::HashMap;
 
 pub enum Schedule {
@@ -20,7 +20,7 @@ pub enum Schedule {
 
 pub struct Scheduler {
     startup_tasks: Vec<StoredTask>,
-    update_tasks: Option<Vec<(Milliseconds<u64>, Milliseconds<u64>, StoredTask)>>,
+    update_tasks: Option<Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>>,
 
     resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>>>,
 }
@@ -57,8 +57,8 @@ impl Scheduler {
                     .as_mut()
                     .expect("Task Runner Already Made")
                     .push((
-                        Milliseconds::new(0),
-                        Milliseconds::new((x * 1000.0) as u64),
+                        Microseconds::new(0),
+                        Microseconds::new((x * 1_000_000.0) as u64),
                         Box::new(task.into_task()),
                     ));
             }
@@ -95,16 +95,7 @@ impl Scheduler {
         self.add_state(S::default());
     }
 
-    /// Builds a `TaskRunner` from the scheduler by invoking all startup tasks and preparing update tasks.
-    ///
-    /// # Parameters
-    ///
-    /// * `self` - A mutable reference to the `Scheduler` instance.
-    ///
-    /// # Returns
-    ///
-    /// * A `TaskRunner` that can execute scheduled tasks based on their timing.
-    pub fn build(&mut self) -> TaskRunner {
+    pub fn build_with_clock<const CLOCK: u32>(&mut self) -> TaskRunner<CLOCK> {
         for task in self.startup_tasks.iter_mut() {
             task.invoke(self.resources.as_mut().unwrap());
         }
@@ -119,24 +110,38 @@ impl Scheduler {
             clock,
         }
     }
+
+    /// Builds a `TaskRunner` from the scheduler by invoking all startup tasks and preparing update tasks.
+    ///
+    /// # Parameters
+    ///
+    /// * `self` - A mutable reference to the `Scheduler` instance.
+    ///
+    /// # Returns
+    ///
+    /// * A `TaskRunner` that can execute scheduled tasks based on their timing.
+    #[cfg(feature = "std")]
+    pub fn build(&mut self) -> TaskRunner<0> {
+        self.build_with_clock()
+    }
 }
 
-pub struct TaskRunner {
-    tasks: Vec<(Milliseconds<u64>, Milliseconds<u64>, StoredTask)>,
+pub struct TaskRunner<const CLOCK: u32> {
+    tasks: Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>,
     resources: HashMap<TypeId, RefCell<Box<dyn Any>>>,
 
-    clock: SystemClock,
-    start_timestamp: Instant<SystemClock>,
+    clock: SystemClock<CLOCK>,
+    start_timestamp: Instant<SystemClock<CLOCK>>,
 }
 
-impl TaskRunner {
+impl<const CLOCK: u32> TaskRunner<CLOCK> {
     /// Runs the scheduled tasks in a loop.
     ///
     /// This function continuously checks and runs tasks based on their scheduling criteria:
     /// - It calculates the current time since the UNIX epoch in milliseconds.
     /// - For each task, it checks if the elapsed time since the last execution is greater than the task's specified interval.
     /// - If the condition is met, it invokes the task with the available resources and updates the last executed time to the current time.
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> ! {
         loop {
             self.run_once();
         }

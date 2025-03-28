@@ -1,5 +1,4 @@
 #![no_std]
-extern crate proc_macro;
 
 pub mod query;
 pub mod scheduler;
