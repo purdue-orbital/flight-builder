@@ -1,8 +1,4 @@
-use std::{
-    ops::{Deref, DerefMut},
-    thread::sleep,
-    time::Duration,
-};
+use std::ops::{Deref, DerefMut};
 
 use flight_builder::prelude::*;
 
@@ -37,7 +33,7 @@ pub fn test_make_scheduler_default() {
 pub fn test_basic_function() {
     let mut s = Scheduler::new();
 
-    s.add_task(Schedule::Update(0.0), basic_function);
+    s.add_task(Update(0.0), basic_function);
 
     s.build().run_once();
 }
@@ -46,7 +42,7 @@ pub fn test_basic_function() {
 pub fn test_basic_startup() {
     let mut s = Scheduler::new();
 
-    s.add_task(Schedule::Startup, basic_function);
+    s.add_task(Startup, basic_function);
 
     s.build().run_once();
 }
@@ -66,17 +62,15 @@ pub fn test_query() {
 
     s.add_resource(2u32);
 
-    s.add_task(Schedule::Update(0.0), plus_1);
-    s.add_task(Schedule::Update(0.0), assert_equal::<3u32>);
+    s.add_task(Update(0.0), plus_1);
+    s.add_task(Update(0.0), assert_equal::<3u32>);
 
-    s.add_task(Schedule::Update(0.0), plus_1);
-    s.add_task(Schedule::Update(0.0), plus_1);
-    s.add_task(Schedule::Update(0.0), plus_1);
-    s.add_task(Schedule::Update(0.0), assert_equal::<6u32>);
+    s.add_task(Update(0.0), plus_1);
+    s.add_task(Update(0.0), plus_1);
+    s.add_task(Update(0.0), plus_1);
+    s.add_task(Update(0.0), assert_equal::<6u32>);
 
     let mut r = s.build();
-
-    sleep(Duration::from_secs_f32(1.0));
 
     r.run_once();
 }

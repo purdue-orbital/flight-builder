@@ -1,18 +1,48 @@
+use super::scheduler::Schedule;
+use super::tasks::Task;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
 
 use super::tasks::StoredTask;
 
-pub type StoredState = Box<dyn States>;
+// pub struct OnEnter<S: States + 'static>(S);
+// impl<S: States + 'static, I, T: Task + 'static> Schedule<I, T> for OnEnter<S> {
+//     fn schedule_task(
+//         &self,
+//         s: &mut crate::prelude::Scheduler,
+//         task: impl crate::prelude::IntoTask<I, Task = T>,
+//     ) {
+//         let map = s.transitions.as_mut().expect("Task Runner already made!");
+
+//         // Check if the transition exists
+//         if let Some(transition) = map.get_mut(&core::any::TypeId::of::<S>()) {
+//             transition
+//                 .borrow_mut()
+//                 .on_enter
+//                 .push(Box::new(task.into_task()));
+//         } else {
+//             let mut transition = crate::prelude::Transition {
+//                 on_enter: Vec::new(),
+//                 on_exit: Vec::new(),
+//             };
+
+//             transition.on_enter.push(Box::new(task.into_task()));
+
+//             map.insert(
+//                 core::any::TypeId::of::<S>(),
+//                 core::cell::RefCell::new(transition),
+//             );
+//         }
+//     }
+// }
+
+pub struct OnExit<S: States + 'static>(S);
 
 pub trait States {}
 
-pub struct Transition<S: States> {
-    on_exit: Vec<StoredTask>,
-    on_enter: Vec<StoredTask>,
-
-    _phantom: PhantomData<S>,
+pub struct Transition {
+    pub(crate) on_enter: Vec<StoredTask>,
+    pub(crate) on_exit: Vec<StoredTask>,
 }
 
 pub struct State<S: States>(pub(crate) S);

@@ -1,4 +1,5 @@
 use super::clock::*;
+use super::events::*;
 use super::states::*;
 use super::tasks::*;
 use alloc::boxed::Box;
@@ -11,18 +12,40 @@ use embedded_time::Instant;
 use embedded_time::duration::Microseconds;
 use hashbrown::HashMap;
 
-pub enum Schedule {
-    Startup,
+pub trait Schedule<I, T: Task + 'static> {
+    fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>);
+}
 
-    /// How often to run this task in seconds
-    Update(f32),
+pub struct Startup;
+impl<I, T: Task + 'static> Schedule<I, T> for Startup {
+    fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>) {
+        s.startup_tasks.push(Box::new(task.into_task()));
+    }
+}
+
+pub struct Update(pub f64);
+impl<I, T: Task + 'static> Schedule<I, T> for Update {
+    fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>) {
+        s.update_tasks
+            .as_mut()
+            .expect("Task Runner Already Made")
+            .push((
+                Microseconds::new(0),
+                Microseconds::new((self.0 * 1_000_000.0) as u64),
+                Box::new(task.into_task()),
+            ));
+    }
 }
 
 pub struct Scheduler {
-    startup_tasks: Vec<StoredTask>,
-    update_tasks: Option<Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>>,
+    pub(crate) startup_tasks: Vec<StoredTask>,
+    pub(crate) update_tasks: Option<Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>>,
 
-    resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>>>,
+    pub(crate) resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>>>,
+    //pub(crate) transitions: Option<HashMap<TypeId, RefCell<Transition>>>,
+    // pub(crate) states_with_transitions: Option<Vec<TypeId>>,
+    //
+    pub(crate) registered_events: Option<Vec<RegisteredEvent>>,
 }
 
 impl Default for Scheduler {
@@ -37,32 +60,21 @@ impl Scheduler {
             startup_tasks: vec![],
             update_tasks: Some(vec![]),
             resources: Some(HashMap::new()),
+            //transitions: Some(HashMap::new()),
+            //states_with_transitions: Some(vec![]),
+            registered_events: Some(vec![]),
         }
     }
 
     /// Adds a task to the scheduler based on the provided schedule and task. This function takes two generic parameters: I for the input type of the task, and S for the concrete Task implementation that implements the Task trait. The Schedule parameter determines when the task will be run - either at startup or on update (with a given frequency in seconds).
     ///
     /// This function checks if the scheduler has already been initialized, then adds the task to the appropriate list (startup tasks or update tasks) and updates the internal state accordingly.
-    pub fn add_task<I, S: Task + 'static>(
+    pub fn add_task<I, T: Task + 'static>(
         &mut self,
-        schedule: Schedule,
-        task: impl IntoTask<I, Task = S>,
+        schedule: impl Schedule<I, T>,
+        task: impl IntoTask<I, Task = T>,
     ) {
-        match schedule {
-            Schedule::Startup => {
-                self.startup_tasks.push(Box::new(task.into_task()));
-            }
-            Schedule::Update(x) => {
-                self.update_tasks
-                    .as_mut()
-                    .expect("Task Runner Already Made")
-                    .push((
-                        Microseconds::new(0),
-                        Microseconds::new((x * 1_000_000.0) as u64),
-                        Box::new(task.into_task()),
-                    ));
-            }
-        }
+        schedule.schedule_task(self, task);
     }
 
     /// Adds a plugin to the scheduler.
@@ -95,16 +107,37 @@ impl Scheduler {
         self.add_state(S::default());
     }
 
+    pub fn add_event<E: 'static + Event>(&mut self) {
+        self.add_resource(EventWriter::<E> { queue: vec![] });
+        self.add_resource(EventReader::<E> { queue: vec![] });
+
+        self.registered_events
+            .as_mut()
+            .unwrap()
+            .push(RegisteredEvent {
+                id: TypeId::of::<EventWriter<E>>(),
+                update: |rec, id| {
+                    let mut writer = rec.get(&id).unwrap().borrow_mut();
+                    let writer = writer.downcast_mut::<EventWriter<E>>().unwrap();
+
+                    writer.send_to_reader(&rec);
+                },
+            });
+    }
+
     pub fn build_with_clock<const CLOCK: u32>(&mut self) -> TaskRunner<CLOCK> {
         for task in self.startup_tasks.iter_mut() {
             task.invoke(self.resources.as_mut().unwrap());
         }
 
         let clock = SystemClock::default();
+        self.add_resource(SystemClock::<CLOCK>::default());
 
         TaskRunner {
             tasks: self.update_tasks.take().unwrap(),
             resources: self.resources.take().unwrap(),
+
+            registered_events: self.registered_events.take().unwrap(),
 
             start_timestamp: clock.try_now().expect("Error can't start timestamp"),
             clock,
@@ -132,6 +165,9 @@ pub struct TaskRunner<const CLOCK: u32> {
 
     clock: SystemClock<CLOCK>,
     start_timestamp: Instant<SystemClock<CLOCK>>,
+    //states_with_transitions: Vec<TypeId>,
+    //transitions: Option<HashMap<TypeId, RefCell<Transition>>>,
+    registered_events: Vec<RegisteredEvent>,
 }
 
 impl<const CLOCK: u32> TaskRunner<CLOCK> {
@@ -148,12 +184,16 @@ impl<const CLOCK: u32> TaskRunner<CLOCK> {
     }
 
     pub fn run_once(&mut self) {
+        for event in self.registered_events.iter() {
+            (event.update)(&self.resources, event.id);
+        }
+
         let t = (self.clock.try_now().expect("Error getting current time") - self.start_timestamp)
             .try_into()
             .expect("Failed to convert time");
 
         for task in self.tasks.iter_mut() {
-            if t - task.0 > task.1 {
+            if t - task.0 >= task.1 {
                 task.2.invoke(&mut self.resources);
 
                 task.0 = t;

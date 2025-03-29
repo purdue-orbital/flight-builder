@@ -1,5 +1,3 @@
-use std::{thread::sleep, time::Duration};
-
 use flight_builder::prelude::*;
 
 #[derive(Default, States, Debug, PartialEq, Eq)]
@@ -46,11 +44,9 @@ pub fn test_add_state() {
 
     s.add_state(TestStates::Test2);
 
-    s.add_task(Schedule::Update(0.0), assert_test2);
+    s.add_task(Update(0.0), assert_test2);
 
     let mut r = s.build();
-
-    sleep(Duration::from_secs_f32(1.0));
 
     r.run_once();
 }
@@ -61,11 +57,9 @@ pub fn test_init_state() {
 
     s.init_state::<TestStates>();
 
-    s.add_task(Schedule::Update(0.0), assert_test1);
+    s.add_task(Update(0.0), assert_test1);
 
     let mut r = s.build();
-
-    sleep(Duration::from_secs_f32(1.0));
 
     r.run_once();
 }
@@ -76,17 +70,15 @@ pub fn test_next_state() {
 
     s.init_state::<TestStates>();
 
-    s.add_task(Schedule::Update(0.0), assert_none);
+    s.add_task(Update(0.0), assert_none);
 
-    s.add_task(Schedule::Update(0.0), set_test2);
+    s.add_task(Update(0.0), set_test2);
 
-    s.add_task(Schedule::Update(0.0), assert_pending_test2);
+    s.add_task(Update(0.0), assert_pending_test2);
 
-    s.add_task(Schedule::Update(0.0), reset_state);
+    s.add_task(Update(0.0), reset_state);
 
     let mut r = s.build();
-
-    sleep(Duration::from_secs_f32(1.0));
 
     r.run_once();
 }

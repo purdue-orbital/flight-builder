@@ -51,13 +51,13 @@ fn main() {
     });
 
     // Add a task that pops a balloon that runs at 1 hz (1/1)
-    s.add_task(Schedule::Update(1.0), pop_check);
+    s.add_task(Update(1.0), pop_check);
 
     // Add a task that updates sensor readings at 100hz
-    s.add_task(Schedule::Update(1.0 / 100.0), check_sensors);
+    s.add_task(Update(1.0 / 100.0), check_sensors);
 
     // Print readings every 5 seconds
-    s.add_task(Schedule::Update(5.0), print_readings);
+    s.add_task(Update(5.0), print_readings);
 
     s.build().run();
 }
