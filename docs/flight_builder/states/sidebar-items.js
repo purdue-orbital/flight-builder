@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["NextState"],"struct":["OnExit","State","Transition"],"trait":["States"]};
