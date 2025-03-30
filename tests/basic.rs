@@ -65,10 +65,10 @@ pub fn test_query() {
     s.add_task(Update(0.0), plus_1);
     s.add_task(Update(0.0), assert_equal::<3u32>);
 
-    s.add_task(Update(0.0), plus_1);
-    s.add_task(Update(0.0), plus_1);
-    s.add_task(Update(0.0), plus_1);
-    s.add_task(Update(0.0), assert_equal::<6u32>);
+    s.add_task(PerATick, plus_1);
+    s.add_task(PerATick, plus_1);
+    s.add_task(PerATick, plus_1);
+    s.add_task(PerATick, assert_equal::<6u32>);
 
     let mut r = s.build();
 

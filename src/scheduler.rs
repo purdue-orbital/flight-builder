@@ -37,7 +37,7 @@ impl<I, T: Task + 'static> Schedule<I, T> for Update {
     }
 }
 
-pub struct PerATick();
+pub struct PerATick;
 impl<I, T: Task + 'static> Schedule<I, T> for PerATick {
     fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>) {
         s.update_tasks
