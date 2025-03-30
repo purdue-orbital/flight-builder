@@ -92,3 +92,105 @@ pub fn test_transition() {
 
     r.run_once();
 }
+
+#[test]
+pub fn test_transition_on_exit() {
+    let mut s = Scheduler::new();
+
+    s.init_state::<TestStates>();
+    s.add_task(Startup, set_test2);
+    s.add_task(OnExit(TestStates::Test1), set_test1);
+    s.add_task(Update(0.001), assert_test1);
+
+    let mut r = s.build();
+
+    r.run_once();
+
+    sleep(Duration::from_secs_f32(0.1));
+
+    r.run_once();
+}
+
+#[test]
+pub fn test_transition_on_transition() {
+    let mut s = Scheduler::new();
+
+    s.init_state::<TestStates>();
+    s.add_task(Startup, set_test2);
+    s.add_task(
+        OnTransition(TestStates::Test1, TestStates::Test2),
+        set_test1,
+    );
+    s.add_task(Update(0.001), assert_test1);
+
+    let mut r = s.build();
+
+    r.run_once();
+
+    sleep(Duration::from_secs_f32(0.1));
+
+    r.run_once();
+}
+
+#[test]
+pub fn test_multi_on_enters() {
+    let mut s = Scheduler::new();
+
+    s.init_state::<TestStates>();
+    s.add_task(Startup, set_test1);
+    s.add_task(OnEnter(TestStates::Test1), set_test2);
+    s.add_task(OnEnter(TestStates::Test1), set_test2);
+    s.add_task(Update(0.001), assert_test2);
+
+    let mut r = s.build();
+
+    r.run_once();
+
+    sleep(Duration::from_secs_f32(0.1));
+
+    r.run_once();
+}
+
+#[test]
+pub fn test_multi_on_exits() {
+    let mut s = Scheduler::new();
+
+    s.init_state::<TestStates>();
+    s.add_task(Startup, set_test2);
+    s.add_task(OnExit(TestStates::Test1), set_test1);
+    s.add_task(OnExit(TestStates::Test1), set_test1);
+    s.add_task(Update(0.001), assert_test1);
+
+    let mut r = s.build();
+
+    r.run_once();
+
+    sleep(Duration::from_secs_f32(0.1));
+
+    r.run_once();
+}
+
+#[test]
+pub fn test_multi_on_transitions() {
+    let mut s = Scheduler::new();
+
+    s.init_state::<TestStates>();
+    s.add_task(Startup, set_test2);
+    s.add_task(
+        OnTransition(TestStates::Test1, TestStates::Test2),
+        set_test1,
+    );
+    s.add_task(
+        OnTransition(TestStates::Test1, TestStates::Test2),
+        set_test1,
+    );
+    s.add_task(Update(0.001), assert_test1);
+
+    let mut r = s.build();
+
+    r.run_once();
+
+    sleep(Duration::from_secs_f32(0.1));
+
+    r.run_once();
+}

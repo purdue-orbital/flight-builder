@@ -8,9 +8,7 @@ use flight_builder_macros::Event;
 
 use super::scheduler::Scheduler;
 use super::tasks::{IntoTask, Task};
-use crate::events::EventReader;
 use crate::prelude::Schedule;
-use crate::query::Res;
 use crate::tasks::StoredTask;
 use hashbrown::HashMap;
 
@@ -113,10 +111,24 @@ impl<I, T: Task + 'static, S: States + 'static + PartialEq + Clone> Schedule<I, 
             .resources
             .as_mut()
             .unwrap()
-            .get_mut(&TypeId::of::<Transition<S>>())
-            .expect("Transition Not Registered");
+            .get_mut(&TypeId::of::<Transition<S>>());
 
-        let arr = &mut t.borrow_mut();
+        let t = if t.is_none() {
+            s.add_resource(Transition::<S> {
+                on_enter: vec![],
+                on_exit: vec![],
+                on_transition: vec![],
+            });
+
+            s.resources
+                .as_mut()
+                .unwrap()
+                .get_mut(&TypeId::of::<Transition<S>>())
+        } else {
+            t
+        };
+
+        let arr = &mut t.unwrap().borrow_mut();
         let arr = arr.downcast_mut::<Transition<S>>().unwrap();
         let arr = &mut arr.on_exit;
 
@@ -137,10 +149,24 @@ impl<I, T: Task + 'static, S: States + 'static + PartialEq + Clone> Schedule<I, 
             .resources
             .as_mut()
             .unwrap()
-            .get_mut(&TypeId::of::<Transition<S>>())
-            .expect("Transition Not Registered");
+            .get_mut(&TypeId::of::<Transition<S>>());
 
-        let arr = &mut t.borrow_mut();
+        let t = if t.is_none() {
+            s.add_resource(Transition::<S> {
+                on_enter: vec![],
+                on_exit: vec![],
+                on_transition: vec![],
+            });
+
+            s.resources
+                .as_mut()
+                .unwrap()
+                .get_mut(&TypeId::of::<Transition<S>>())
+        } else {
+            t
+        };
+
+        let arr = &mut t.unwrap().borrow_mut();
         let arr = arr.downcast_mut::<Transition<S>>().unwrap();
         let arr = &mut arr.on_transition;
 

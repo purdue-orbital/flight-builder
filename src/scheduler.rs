@@ -3,7 +3,6 @@ use super::events::*;
 use super::states::*;
 use super::tasks::*;
 use alloc::boxed::Box;
-use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
@@ -125,10 +124,11 @@ impl Scheduler {
                         .unwrap();
 
                     if let Some(next_state) = next_state.take_next_state() {
+                        let last = state.get().clone();
                         state.0 = next_state.clone();
 
                         event_writer.send(StateTransitionEvent {
-                            from: state.get().clone(),
+                            from: last,
                             to: next_state.clone(),
                         });
                     }
