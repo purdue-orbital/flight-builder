@@ -42,5 +42,5 @@ fn main() -> ! {
     s.add_task(Startup, switch_light);
     s.add_task(Update(1.0), switch_light);
 
-    s.build_with_clock::<133_000_000>().run();
+    s.build_with_clock::<150_000_000>().run();
 }

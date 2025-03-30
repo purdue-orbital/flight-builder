@@ -20,6 +20,7 @@ pub struct SensorReadings {
     pub temperature: f32,
     pub humidity: f32,
 }
+
 fn check_sensors(mut sensor_readings: ResMut<SensorReadings>) {
     sensor_readings.bar += (random::<f32>() * 10.0) - 5.0;
     sensor_readings.temperature += (random::<f32>() * 10.0) - 5.0;
@@ -53,8 +54,8 @@ fn main() {
     // Add a task that pops a balloon that runs at 1 hz (1/1)
     s.add_task(Update(1.0), pop_check);
 
-    // Add a task that updates sensor readings at 100hz
-    s.add_task(Update(1.0 / 100.0), check_sensors);
+    // Add a task that updates sensor readings as fast as the system can
+    s.add_task(PerATick(), check_sensors);
 
     // Print readings every 5 seconds
     s.add_task(Update(5.0), print_readings);

@@ -37,6 +37,20 @@ impl<I, T: Task + 'static> Schedule<I, T> for Update {
     }
 }
 
+pub struct PerATick();
+impl<I, T: Task + 'static> Schedule<I, T> for PerATick {
+    fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>) {
+        s.update_tasks
+            .as_mut()
+            .expect("Task Runner Already Made")
+            .push((
+                Microseconds::new(0),
+                Microseconds::new(0),
+                Box::new(task.into_task()),
+            ));
+    }
+}
+
 pub struct Scheduler {
     pub(crate) startup_tasks: Vec<StoredTask>,
     pub(crate) update_tasks: Option<Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>>,

@@ -78,7 +78,7 @@ impl<const CLOCK: u32> Default for SystemClock<CLOCK> {
 impl<const CLOCK: u32> Clock for SystemClock<CLOCK> {
     type T = u64;
     const SCALING_FACTOR: embedded_time::rate::Fraction =
-        embedded_time::rate::Fraction::new(1, 1_00_000);
+        embedded_time::rate::Fraction::new(1, 1_000_000);
 
     fn try_now(&self) -> Result<embedded_time::Instant<Self>, embedded_time::clock::Error> {
         Ok(embedded_time::Instant::new(
