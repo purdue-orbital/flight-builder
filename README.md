@@ -42,7 +42,7 @@ fn main() {
     });
 
     // Add a task that updates sensor readings as fast as the system can run
-    s.add_task(PerATick(), check_sensors);
+    s.add_task(PerATick, check_sensors);
 
     // Add a task that runs every 5 seconds
     s.add_task(Update(5.0), print_sensors);
