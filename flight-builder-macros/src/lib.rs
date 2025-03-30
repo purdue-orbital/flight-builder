@@ -14,8 +14,10 @@ pub fn create_states_for_enum(input: TokenStream) -> TokenStream {
 
     let name = input.ident;
 
+    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
+
     let expanded = quote! {
-        impl States for #name {}
+        impl #impl_generics States for #name #type_generics #where_clause {}
     };
 
     TokenStream::from(expanded)
@@ -26,8 +28,10 @@ pub fn create_event_for_struct(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
 
+    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
+
     let expanded = quote! {
-        impl Event for #name {}
+        impl #impl_generics Event for #name #type_generics #where_clause {}
     };
 
     TokenStream::from(expanded)

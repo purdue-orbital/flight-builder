@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use hashbrown::HashMap;
 
 pub trait Task {
-    fn invoke(&mut self, args: &mut HashMap<TypeId, RefCell<Box<dyn Any>>>);
+    fn invoke(&mut self, args: &HashMap<TypeId, RefCell<Box<dyn Any>>>);
 }
 
 pub type StoredTask = Box<dyn Task>;
@@ -60,7 +60,7 @@ macro_rules! impl_task {
                 FnMut($($params),*) +
                 FnMut($(<$params as TaskParam>::Item<'b>),*)
         {
-            fn invoke(&mut self, resources: &mut HashMap<TypeId, RefCell<Box<dyn Any>>>) {
+            fn invoke(&mut self, resources: &HashMap<TypeId, RefCell<Box<dyn Any>>>) {
                 fn call_inner<$($params),*>(
                         mut f: impl FnMut($($params),*),
                     $(

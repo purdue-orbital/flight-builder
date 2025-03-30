@@ -1,6 +1,8 @@
+use std::{thread::sleep, time::Duration};
+
 use flight_builder::prelude::*;
 
-#[derive(Default, States, Debug, PartialEq, Eq)]
+#[derive(Default, States, Debug, PartialEq, Clone)]
 pub enum TestStates {
     #[default]
     Test1,
@@ -46,9 +48,7 @@ pub fn test_add_state() {
 
     s.add_task(Update(0.0), assert_test2);
 
-    let mut r = s.build();
-
-    r.run_once();
+    s.build().run_once();
 }
 
 #[test]
@@ -56,12 +56,9 @@ pub fn test_init_state() {
     let mut s = Scheduler::new();
 
     s.init_state::<TestStates>();
-
     s.add_task(Update(0.0), assert_test1);
 
-    let mut r = s.build();
-
-    r.run_once();
+    s.build().run_once();
 }
 
 #[test]
@@ -71,14 +68,27 @@ pub fn test_next_state() {
     s.init_state::<TestStates>();
 
     s.add_task(Update(0.0), assert_none);
-
     s.add_task(Update(0.0), set_test2);
-
     s.add_task(Update(0.0), assert_pending_test2);
-
     s.add_task(Update(0.0), reset_state);
 
+    s.build().run_once();
+}
+
+#[test]
+pub fn test_transition() {
+    let mut s = Scheduler::new();
+
+    s.init_state::<TestStates>();
+    s.add_task(Startup, set_test1);
+    s.add_task(OnEnter(TestStates::Test1), set_test2);
+    s.add_task(Update(0.001), assert_test2);
+
     let mut r = s.build();
+
+    r.run_once();
+
+    sleep(Duration::from_secs_f32(0.01));
 
     r.run_once();
 }

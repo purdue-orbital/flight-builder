@@ -3,6 +3,7 @@ use super::events::*;
 use super::states::*;
 use super::tasks::*;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
@@ -40,12 +41,11 @@ impl<I, T: Task + 'static> Schedule<I, T> for Update {
 pub struct Scheduler {
     pub(crate) startup_tasks: Vec<StoredTask>,
     pub(crate) update_tasks: Option<Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>>,
-
     pub(crate) resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>>>,
-    //pub(crate) transitions: Option<HashMap<TypeId, RefCell<Transition>>>,
-    // pub(crate) states_with_transitions: Option<Vec<TypeId>>,
-    //
+
     pub(crate) registered_events: Option<Vec<RegisteredEvent>>,
+    pub(crate) registered_states: Option<Vec<RegisteredState>>,
+    pub(crate) registered_transitions: Option<Vec<RegisteredTransition>>,
 }
 
 impl Default for Scheduler {
@@ -60,9 +60,10 @@ impl Scheduler {
             startup_tasks: vec![],
             update_tasks: Some(vec![]),
             resources: Some(HashMap::new()),
-            //transitions: Some(HashMap::new()),
-            //states_with_transitions: Some(vec![]),
+
             registered_events: Some(vec![]),
+            registered_states: Some(vec![]),
+            registered_transitions: Some(vec![]),
         }
     }
 
@@ -98,12 +99,61 @@ impl Scheduler {
             .insert(TypeId::of::<R>(), RefCell::new(Box::new(resource)));
     }
 
-    pub fn add_state<S: 'static + States>(&mut self, state: S) {
+    pub fn add_state<S: 'static + States + Clone + PartialEq>(&mut self, state: S) {
         self.add_resource(NextState::<S>::Unchanged);
         self.add_resource(State(state));
+
+        self.add_event::<StateTransitionEvent<S>>();
+
+        self.registered_states
+            .as_mut()
+            .unwrap()
+            .push(RegisteredState {
+                id: TypeId::of::<State<S>>(),
+                event_id: TypeId::of::<EventWriter<StateTransitionEvent<S>>>(),
+                update: |rec, id, event_id| {
+                    let mut state = rec.get(&id).unwrap().borrow_mut();
+                    let state = state.downcast_mut::<State<S>>().unwrap();
+
+                    let mut next_state =
+                        rec.get(&TypeId::of::<NextState<S>>()).unwrap().borrow_mut();
+                    let next_state = next_state.downcast_mut::<NextState<S>>().unwrap();
+
+                    let mut event_writer = rec.get(&event_id).unwrap().borrow_mut();
+                    let event_writer = event_writer
+                        .downcast_mut::<EventWriter<StateTransitionEvent<S>>>()
+                        .unwrap();
+
+                    if let Some(next_state) = next_state.take_next_state() {
+                        state.0 = next_state.clone();
+
+                        event_writer.send(StateTransitionEvent {
+                            from: state.get().clone(),
+                            to: next_state.clone(),
+                        });
+                    }
+                },
+            });
+
+        self.registered_transitions
+            .as_mut()
+            .unwrap()
+            .push(RegisteredTransition {
+                id: TypeId::of::<EventReader<StateTransitionEvent<S>>>(),
+                update: |rec, id| {
+                    let event_reader = rec.get(&id).unwrap().borrow();
+                    let event_reader = event_reader
+                        .downcast_ref::<EventReader<StateTransitionEvent<S>>>()
+                        .unwrap();
+
+                    for event in event_reader.queue.iter() {
+                        event.apply_transition(&rec);
+                    }
+                },
+            });
     }
 
-    pub fn init_state<S: 'static + States + Default>(&mut self) {
+    pub fn init_state<S: 'static + States + Default + Clone + PartialEq>(&mut self) {
         self.add_state(S::default());
     }
 
@@ -127,7 +177,7 @@ impl Scheduler {
 
     pub fn build_with_clock<const CLOCK: u32>(&mut self) -> TaskRunner<CLOCK> {
         for task in self.startup_tasks.iter_mut() {
-            task.invoke(self.resources.as_mut().unwrap());
+            task.invoke(&self.resources.as_ref().unwrap());
         }
 
         let clock = SystemClock::default();
@@ -138,6 +188,8 @@ impl Scheduler {
             resources: self.resources.take().unwrap(),
 
             registered_events: self.registered_events.take().unwrap(),
+            registered_states: self.registered_states.take().unwrap(),
+            registered_transitions: self.registered_transitions.take().unwrap(),
 
             start_timestamp: clock.try_now().expect("Error can't start timestamp"),
             clock,
@@ -165,9 +217,10 @@ pub struct TaskRunner<const CLOCK: u32> {
 
     clock: SystemClock<CLOCK>,
     start_timestamp: Instant<SystemClock<CLOCK>>,
-    //states_with_transitions: Vec<TypeId>,
-    //transitions: Option<HashMap<TypeId, RefCell<Transition>>>,
+
     registered_events: Vec<RegisteredEvent>,
+    registered_states: Vec<RegisteredState>,
+    registered_transitions: Vec<RegisteredTransition>,
 }
 
 impl<const CLOCK: u32> TaskRunner<CLOCK> {
@@ -184,14 +237,27 @@ impl<const CLOCK: u32> TaskRunner<CLOCK> {
     }
 
     pub fn run_once(&mut self) {
+        // Update the states
+        for state in self.registered_states.iter() {
+            (state.update)(&self.resources, state.id, state.event_id);
+        }
+
+        // Update the events
         for event in self.registered_events.iter() {
             (event.update)(&self.resources, event.id);
         }
 
+        // Update the transitions
+        for transition in self.registered_transitions.iter() {
+            (transition.update)(&self.resources, transition.id);
+        }
+
+        // Get the current time
         let t = (self.clock.try_now().expect("Error getting current time") - self.start_timestamp)
             .try_into()
             .expect("Failed to convert time");
 
+        // Run the tasks
         for task in self.tasks.iter_mut() {
             if t - task.0 >= task.1 {
                 task.2.invoke(&mut self.resources);
