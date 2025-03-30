@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["PerATick","Scheduler","Startup","TaskRunner","Update"],"trait":["Schedule"]};
