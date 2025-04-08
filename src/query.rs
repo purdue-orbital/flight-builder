@@ -1,16 +1,16 @@
-use alloc::boxed::Box;
 use core::any::Any;
 use core::cell::{Ref, RefMut};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
+use without_alloc::Box;
 
 pub struct Res<'a, T: 'static> {
-    pub(crate) value: Ref<'a, Box<dyn Any>>,
+    pub(crate) value: Ref<'a, Box<'static, dyn Any>>,
     pub(crate) _marker: PhantomData<&'a T>,
 }
 
 pub struct ResMut<'a, T: 'static> {
-    pub(crate) value: RefMut<'a, Box<dyn Any>>,
+    pub(crate) value: RefMut<'a, Box<'static, dyn Any>>,
     pub(crate) _marker: PhantomData<&'a mut T>,
 }
 

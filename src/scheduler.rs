@@ -1,18 +1,23 @@
+use crate::MAX_EVENTS;
+use crate::MAX_STATES;
+use crate::MAX_TASKS;
+use crate::MAX_TRANSITIONS;
+
+use super::MAX_RESOURCES;
+use super::MAX_STARTUP_TASKS;
+use super::SLAB;
 use super::clock::*;
 use super::events::*;
 use super::map::Map as HashMap;
 use super::states::*;
 use super::tasks::*;
-use alloc::boxed::Box;
-use alloc::vec;
-use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use embedded_time::Clock;
 use embedded_time::Instant;
 use embedded_time::duration::Microseconds;
-
-pub const MAX_RESOURCES: usize = 1024;
+use without_alloc::Box;
+use without_alloc::alloc::LocalAllocLeakExt;
 
 pub trait Schedule<I, T: Task + 'static> {
     fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>);
@@ -21,7 +26,7 @@ pub trait Schedule<I, T: Task + 'static> {
 pub struct Startup;
 impl<I, T: Task + 'static> Schedule<I, T> for Startup {
     fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>) {
-        s.startup_tasks.push(Box::new(task.into_task()));
+        s.startup_tasks.push(SLAB.boxed(task.into_task()));
     }
 }
 
@@ -34,7 +39,7 @@ impl<I, T: Task + 'static> Schedule<I, T> for Update {
             .push((
                 Microseconds::new(0),
                 Microseconds::new((self.0 * 1_000_000.0) as u64),
-                Box::new(task.into_task()),
+                SLAB.boxed(task.into_task()),
             ));
     }
 }
@@ -48,19 +53,20 @@ impl<I, T: Task + 'static> Schedule<I, T> for PerATick {
             .push((
                 Microseconds::new(0),
                 Microseconds::new(0),
-                Box::new(task.into_task()),
+                SLAB.boxed(task.into_task()),
             ));
     }
 }
 
 pub struct Scheduler {
-    pub(crate) startup_tasks: Vec<StoredTask>,
-    pub(crate) update_tasks: Option<Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>>,
-    pub(crate) resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>>,
+    pub(crate) startup_tasks: [Option<StoredTask>; MAX_STARTUP_TASKS],
+    pub(crate) update_tasks:
+        Option<[Option<(Microseconds<u64>, Microseconds<u64>, StoredTask)>; MAX_TASKS]>,
+    pub(crate) resources: Option<HashMap<TypeId, RefCell<Box<'static, dyn Any>>, MAX_RESOURCES>>,
 
-    pub(crate) registered_events: Option<Vec<RegisteredEvent>>,
-    pub(crate) registered_states: Option<Vec<RegisteredState>>,
-    pub(crate) registered_transitions: Option<Vec<RegisteredTransition>>,
+    pub(crate) registered_events: Option<[Option<RegisteredEvent>; MAX_EVENTS]>,
+    pub(crate) registered_states: Option<[Option<RegisteredState>; MAX_STATES]>,
+    pub(crate) registered_transitions: Option<[Option<RegisteredTransition>; MAX_TRANSITIONS]>,
 }
 
 impl Default for Scheduler {
@@ -72,13 +78,13 @@ impl Default for Scheduler {
 impl Scheduler {
     pub fn new() -> Self {
         Scheduler {
-            startup_tasks: vec![],
-            update_tasks: Some(vec![]),
+            startup_tasks: [const { None }; MAX_STARTUP_TASKS],
+            update_tasks: Some([const { None }; MAX_TASKS]),
             resources: Some(HashMap::new()),
 
-            registered_events: Some(vec![]),
-            registered_states: Some(vec![]),
-            registered_transitions: Some(vec![]),
+            registered_events: Some([const { None }; MAX_EVENTS]),
+            registered_states: Some([const { None }; MAX_STATES]),
+            registered_transitions: Some([const { None }; MAX_TRANSITIONS]),
         }
     }
 
@@ -111,7 +117,10 @@ impl Scheduler {
         self.resources
             .as_mut()
             .expect("Task Runner Already Made")
-            .insert(TypeId::of::<R>(), RefCell::new(Box::new(resource)));
+            .insert(
+                TypeId::of::<R>(),
+                RefCell::new(SLAB.boxed(resource).unwrap()),
+            );
     }
 
     pub fn add_state<S: 'static + States + Clone + PartialEq>(&mut self, state: S) {

@@ -1,16 +1,16 @@
+use super::MAX_RESOURCES;
 use super::map::Map as HashMap;
 use super::query::*;
-use super::scheduler::MAX_RESOURCES;
-use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use core::marker::PhantomData;
+use without_alloc::Box;
 
 pub trait Task {
     fn invoke(&mut self, args: &HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>);
 }
 
-pub type StoredTask = Box<dyn Task>;
+pub type StoredTask = Box<'static, dyn Task>;
 
 pub struct FunctionTask<Input, F> {
     f: F,
@@ -25,7 +25,7 @@ pub trait IntoTask<Input> {
 pub(crate) trait TaskParam {
     type Item<'new>;
     fn retrieve<'r>(
-        resources: &'r HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>,
+        resources: &'r HashMap<TypeId, RefCell<Box<'static, dyn Any>>, MAX_RESOURCES>,
     ) -> Self::Item<'r>;
 }
 

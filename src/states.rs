@@ -1,15 +1,15 @@
 use super::events::Event;
-use alloc::boxed::Box;
-use alloc::vec;
-use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use flight_builder_macros::Event;
+use without_alloc::Box;
 
+use super::MAX_RESOURCES;
+use super::MAX_TRANSITIONS;
 use super::map::Map as HashMap;
-use super::scheduler::MAX_RESOURCES;
 use super::scheduler::Scheduler;
 use super::tasks::{IntoTask, Task};
+use crate::MAX_TRANSITION_TASKS;
 use crate::prelude::Schedule;
 use crate::tasks::StoredTask;
 
@@ -157,9 +157,9 @@ impl<I, T: Task + 'static, S: States + 'static + PartialEq + Clone> Schedule<I, 
 
         let t = if t.is_none() {
             s.add_resource(Transition::<S> {
-                on_enter: vec![],
-                on_exit: vec![],
-                on_transition: vec![],
+                on_enter: [const { None }; MAX_TRANSITIONS],
+                on_exit: [const { None }; MAX_TRANSITIONS],
+                on_transition: [const { None }; MAX_TRANSITIONS],
             });
 
             s.resources
@@ -181,19 +181,18 @@ impl<I, T: Task + 'static, S: States + 'static + PartialEq + Clone> Schedule<I, 
         {
             tasks.push(Box::new(task.into_task()));
         } else {
-            arr.push((
-                self.0.clone(),
-                self.1.clone(),
-                vec![Box::new(task.into_task())],
-            ));
+            let a = [const { None }; MAX_TRANSITION_TASKS];
+            a[0].replace(Box::new(task.into_task()));
+            arr.push((self.0.clone(), self.1.clone(), a));
         }
     }
 }
 
 pub struct Transition<S: States> {
-    pub(super) on_enter: Vec<(S, Vec<StoredTask>)>,
-    pub(super) on_exit: Vec<(S, Vec<StoredTask>)>,
-    pub(super) on_transition: Vec<(S, S, Vec<StoredTask>)>,
+    pub(super) on_enter: [Option<(S, [Option<StoredTask>; MAX_TRANSITION_TASKS])>; MAX_TRANSITIONS],
+    pub(super) on_exit: [Option<(S, [Option<StoredTask>; MAX_TRANSITION_TASKS])>; MAX_TRANSITIONS],
+    pub(super) on_transition:
+        [Option<(S, S, [Option<StoredTask>; MAX_TRANSITION_TASKS])>; MAX_TRANSITIONS],
 }
 
 pub struct State<S: States>(pub(crate) S);
