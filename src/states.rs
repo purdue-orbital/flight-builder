@@ -6,23 +6,24 @@ use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use flight_builder_macros::Event;
 
+use super::map::Map as HashMap;
+use super::scheduler::MAX_RESOURCES;
 use super::scheduler::Scheduler;
 use super::tasks::{IntoTask, Task};
 use crate::prelude::Schedule;
 use crate::tasks::StoredTask;
-use hashbrown::HashMap;
 
 pub trait States {}
 
 pub struct RegisteredState {
     pub(super) id: TypeId,
     pub(super) event_id: TypeId,
-    pub(super) update: fn(&HashMap<TypeId, RefCell<Box<dyn Any>>>, TypeId, TypeId),
+    pub(super) update: fn(&HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>, TypeId, TypeId),
 }
 
 pub struct RegisteredTransition {
     pub(super) id: TypeId,
-    pub(super) update: fn(&HashMap<TypeId, RefCell<Box<dyn Any>>>, TypeId),
+    pub(super) update: fn(&HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>, TypeId),
 }
 
 #[derive(Event)]
@@ -32,7 +33,10 @@ pub struct StateTransitionEvent<S: States> {
 }
 
 impl<S: States + 'static + PartialEq> StateTransitionEvent<S> {
-    pub(super) fn apply_transition(&self, r: &HashMap<TypeId, RefCell<Box<dyn Any>>>) {
+    pub(super) fn apply_transition(
+        &self,
+        r: &HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>,
+    ) {
         let mut transition = r.get(&TypeId::of::<Transition<S>>()).unwrap().borrow_mut();
         let transition = transition.downcast_mut::<Transition<S>>().unwrap();
 

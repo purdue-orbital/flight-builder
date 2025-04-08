@@ -1,12 +1,13 @@
+use super::map::Map as HashMap;
 use super::query::*;
+use super::scheduler::MAX_RESOURCES;
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
 use core::marker::PhantomData;
-use hashbrown::HashMap;
 
 pub trait Task {
-    fn invoke(&mut self, args: &HashMap<TypeId, RefCell<Box<dyn Any>>>);
+    fn invoke(&mut self, args: &HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>);
 }
 
 pub type StoredTask = Box<dyn Task>;
@@ -23,13 +24,17 @@ pub trait IntoTask<Input> {
 
 pub(crate) trait TaskParam {
     type Item<'new>;
-    fn retrieve<'r>(resources: &'r HashMap<TypeId, RefCell<Box<dyn Any>>>) -> Self::Item<'r>;
+    fn retrieve<'r>(
+        resources: &'r HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>,
+    ) -> Self::Item<'r>;
 }
 
 impl<'res, T: 'static> TaskParam for Res<'res, T> {
     type Item<'new> = Res<'new, T>;
 
-    fn retrieve<'r>(resources: &'r HashMap<TypeId, RefCell<Box<dyn Any>>>) -> Self::Item<'r> {
+    fn retrieve<'r>(
+        resources: &'r HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>,
+    ) -> Self::Item<'r> {
         Res {
             value: resources.get(&TypeId::of::<T>()).unwrap().borrow(),
             _marker: PhantomData,
@@ -41,7 +46,7 @@ impl<'res, T: 'static> TaskParam for ResMut<'res, T> {
     type Item<'new> = ResMut<'new, T>;
 
     fn retrieve<'r>(
-        resources: &'r HashMap<TypeId, RefCell<Box<(dyn Any + 'static)>>>,
+        resources: &'r HashMap<TypeId, RefCell<Box<(dyn Any + 'static)>>, MAX_RESOURCES>,
     ) -> Self::Item<'r> {
         ResMut {
             value: resources.get(&TypeId::of::<T>()).unwrap().borrow_mut(),
@@ -60,7 +65,7 @@ macro_rules! impl_task {
                 FnMut($($params),*) +
                 FnMut($(<$params as TaskParam>::Item<'b>),*)
         {
-            fn invoke(&mut self, resources: &HashMap<TypeId, RefCell<Box<dyn Any>>>) {
+            fn invoke(&mut self, resources: &HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>) {
                 fn call_inner<$($params),*>(
                         mut f: impl FnMut($($params),*),
                     $(

@@ -1,5 +1,6 @@
 use super::clock::*;
 use super::events::*;
+use super::map::Map as HashMap;
 use super::states::*;
 use super::tasks::*;
 use alloc::boxed::Box;
@@ -10,7 +11,8 @@ use core::cell::RefCell;
 use embedded_time::Clock;
 use embedded_time::Instant;
 use embedded_time::duration::Microseconds;
-use hashbrown::HashMap;
+
+pub const MAX_RESOURCES: usize = 1024;
 
 pub trait Schedule<I, T: Task + 'static> {
     fn schedule_task(&self, s: &mut Scheduler, task: impl IntoTask<I, Task = T>);
@@ -54,7 +56,7 @@ impl<I, T: Task + 'static> Schedule<I, T> for PerATick {
 pub struct Scheduler {
     pub(crate) startup_tasks: Vec<StoredTask>,
     pub(crate) update_tasks: Option<Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>>,
-    pub(crate) resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>>>,
+    pub(crate) resources: Option<HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>>,
 
     pub(crate) registered_events: Option<Vec<RegisteredEvent>>,
     pub(crate) registered_states: Option<Vec<RegisteredState>>,
@@ -227,7 +229,7 @@ impl Scheduler {
 
 pub struct TaskRunner<const CLOCK: u32> {
     tasks: Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>,
-    resources: HashMap<TypeId, RefCell<Box<dyn Any>>>,
+    resources: HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>,
 
     clock: SystemClock<CLOCK>,
     start_timestamp: Instant<SystemClock<CLOCK>>,

@@ -1,14 +1,15 @@
+use super::map::Map as HashMap;
+use super::scheduler::MAX_RESOURCES;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
-use hashbrown::HashMap;
 
 pub trait Event {}
 
 pub struct RegisteredEvent {
     pub(super) id: TypeId,
-    pub(super) update: fn(&HashMap<TypeId, RefCell<Box<dyn Any>>>, TypeId),
+    pub(super) update: fn(&HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>, TypeId),
 }
 
 pub struct EventReader<S: Event> {
@@ -31,7 +32,10 @@ impl<S: Event + 'static> EventWriter<S> {
         self.queue.push(event);
     }
 
-    pub(crate) fn send_to_reader(&mut self, rescouce: &HashMap<TypeId, RefCell<Box<dyn Any>>>) {
+    pub(crate) fn send_to_reader(
+        &mut self,
+        rescouce: &HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>,
+    ) {
         let queue = core::mem::replace(&mut self.queue, Vec::new());
 
         let mut reader = rescouce

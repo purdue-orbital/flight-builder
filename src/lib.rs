@@ -6,6 +6,8 @@ pub mod scheduler;
 pub mod states;
 pub mod tasks;
 
+mod map;
+
 mod clock;
 
 extern crate alloc;
