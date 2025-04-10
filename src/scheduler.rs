@@ -197,7 +197,8 @@ impl Scheduler {
         }
 
         let clock = SystemClock::default();
-        self.add_resource(SystemClock::<CLOCK>::default());
+        let start = clock.try_now().expect("Error can't start clock");
+        self.add_resource(clock);
 
         TaskRunner {
             tasks: self.update_tasks.take().unwrap(),
@@ -207,8 +208,7 @@ impl Scheduler {
             registered_states: self.registered_states.take().unwrap(),
             registered_transitions: self.registered_transitions.take().unwrap(),
 
-            start_timestamp: clock.try_now().expect("Error can't start timestamp"),
-            clock,
+            start_timestamp: start,
         }
     }
 
@@ -231,7 +231,6 @@ pub struct TaskRunner<const CLOCK: u32> {
     tasks: Vec<(Microseconds<u64>, Microseconds<u64>, StoredTask)>,
     resources: HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>,
 
-    clock: SystemClock<CLOCK>,
     start_timestamp: Instant<SystemClock<CLOCK>>,
 
     registered_events: Vec<RegisteredEvent>,
@@ -268,17 +267,27 @@ impl<const CLOCK: u32> TaskRunner<CLOCK> {
             (transition.update)(&self.resources, transition.id);
         }
 
+        let t = self
+            .resources
+            .get(&TypeId::of::<SystemClock<CLOCK>>())
+            .unwrap()
+            .borrow();
+
+        let clock = t.downcast_ref::<SystemClock<CLOCK>>().unwrap();
+
         // Get the current time
-        let t = (self.clock.try_now().expect("Error getting current time") - self.start_timestamp)
+        let time = (clock.try_now().expect("Error getting current time") - self.start_timestamp)
             .try_into()
             .expect("Failed to convert time");
 
+        drop(t);
+
         // Run the tasks
         for task in self.tasks.iter_mut() {
-            if t - task.0 >= task.1 {
+            if time - task.0 >= task.1 {
                 task.2.invoke(&mut self.resources);
 
-                task.0 = t;
+                task.0 = time;
             }
         }
     }

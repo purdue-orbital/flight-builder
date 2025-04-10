@@ -65,7 +65,7 @@ impl<const CLOCK: u32> Default for SystemClock<CLOCK> {
         let mut syst = c.SYST;
 
         syst.set_clock_source(cortex_m::peripheral::syst::SystClkSource::Core);
-        syst.set_reload(CLOCK / 1_00_000);
+        syst.set_reload(CLOCK / 10_000);
         syst.clear_current();
         syst.enable_counter();
         syst.enable_interrupt();
@@ -91,7 +91,7 @@ impl<const CLOCK: u32> Clock for SystemClock<CLOCK> {
 impl<const CLOCK: u32> Clock for SystemClock<CLOCK> {
     type T = u64;
     const SCALING_FACTOR: embedded_time::rate::Fraction =
-        embedded_time::rate::Fraction::new(1, 1_00_000); // had to lower to allow time for systick
+        embedded_time::rate::Fraction::new(1, 10_000); // had to lower to allow time for systick
 
     fn try_now(&self) -> Result<embedded_time::Instant<Self>, embedded_time::clock::Error> {
         free(|cs| {
