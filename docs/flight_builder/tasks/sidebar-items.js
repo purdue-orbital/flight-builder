@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["FunctionTask"],"trait":["IntoTask","Task"],"type":["StoredTask"]};

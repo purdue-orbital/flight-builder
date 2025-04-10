@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_RESOURCES"],"struct":["PerATick","Scheduler","Startup","TaskRunner","Update"],"trait":["Schedule"]};
