@@ -1,4 +1,3 @@
-use super::clock::*;
 use super::events::*;
 use super::map::Map as HashMap;
 use super::states::*;
@@ -8,20 +7,17 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
-use embedded_time::Clock;
 use embedded_time::duration::Microseconds;
 
-use runner::TaskRunner;
 
 pub const MAX_RESOURCES: usize = 1024;
 
 pub mod schedule;
 pub mod runner;
+pub mod add;
+pub mod build;
 
-use crate::events::reader::EventReader;
-use crate::events::writer::EventWriter;
 use crate::scheduler::schedule::{Schedule};
-use crate::states::state_transition_event::StateTransitionEvent;
 
 pub struct Scheduler {
     pub(crate) startup_tasks: Vec<StoredTask>,
@@ -50,149 +46,5 @@ impl Scheduler {
             registered_states: Some(vec![]),
             registered_transitions: Some(vec![]),
         }
-    }
-
-    /// Adds a task to the scheduler based on the provided schedule and task. This function takes two generic parameters: I for the input type of the task, and S for the concrete Task implementation that implements the Task trait. The Schedule parameter determines when the task will be run - either at startup or on update (with a given frequency in seconds).
-    ///
-    /// This function checks if the scheduler has already been initialized, then adds the task to the appropriate list (startup tasks or update tasks) and updates the internal state accordingly.
-    pub fn add_task<I, T: Task + 'static>(
-        &mut self,
-        schedule: impl Schedule<I, T>,
-        task: impl IntoTask<I, Task = T>,
-    ) {
-        schedule.schedule_task(self, task);
-    }
-
-    /// Adds a plugin to the scheduler.
-    ///
-    /// # Parameters
-    ///
-    /// * `plugin` - A function that takes a mutable reference to the Scheduler and modifies it as needed.
-    pub fn add_plugin(&mut self, plugin: impl Fn(&mut Scheduler)) {
-        plugin(self);
-    }
-
-    /// Adds a resource to the scheduler.
-    ///
-    /// # Parameters
-    ///
-    /// * `resource` - The resource to be added, which must have a static lifetime.
-    pub fn add_resource<R: 'static>(&mut self, resource: R) {
-        self.resources
-            .as_mut()
-            .expect("Task Runner Already Made")
-            .insert(TypeId::of::<R>(), RefCell::new(Box::new(resource)));
-    }
-
-    pub fn add_state<S: 'static + States + Clone + PartialEq>(&mut self, state: S) {
-        self.add_resource(NextState::<S>::Unchanged);
-        self.add_resource(State(state));
-
-        self.add_event::<StateTransitionEvent<S>>();
-
-        self.registered_states
-            .as_mut()
-            .unwrap()
-            .push(RegisteredState {
-                id: TypeId::of::<State<S>>(),
-                event_id: TypeId::of::<EventWriter<StateTransitionEvent<S>>>(),
-                update: |rec, id, event_id| {
-                    let mut state = rec.get(&id).unwrap().borrow_mut();
-                    let state = state.downcast_mut::<State<S>>().unwrap();
-
-                    let mut next_state =
-                        rec.get(&TypeId::of::<NextState<S>>()).unwrap().borrow_mut();
-                    let next_state = next_state.downcast_mut::<NextState<S>>().unwrap();
-
-                    let mut event_writer = rec.get(&event_id).unwrap().borrow_mut();
-                    let event_writer = event_writer
-                        .downcast_mut::<EventWriter<StateTransitionEvent<S>>>()
-                        .unwrap();
-
-                    if let Some(next_state) = next_state.take_next_state() {
-                        let last = state.get().clone();
-                        state.0 = next_state.clone();
-
-                        event_writer.send(StateTransitionEvent {
-                            from: last,
-                            to: next_state.clone(),
-                        });
-                    }
-                },
-            });
-
-        self.registered_transitions
-            .as_mut()
-            .unwrap()
-            .push(RegisteredTransition {
-                id: TypeId::of::<EventReader<StateTransitionEvent<S>>>(),
-                update: |rec, id| {
-                    let event_reader = rec.get(&id).unwrap().borrow();
-                    let event_reader = event_reader
-                        .downcast_ref::<EventReader<StateTransitionEvent<S>>>()
-                        .unwrap();
-
-                    for event in event_reader.queue.iter() {
-                        event.apply_transition(&rec);
-                    }
-                },
-            });
-    }
-
-    pub fn init_state<S: 'static + States + Default + Clone + PartialEq>(&mut self) {
-        self.add_state(S::default());
-    }
-
-    pub fn add_event<E: 'static + Event>(&mut self) {
-        self.add_resource(EventReader::<E> { queue: vec![] });
-        self.add_resource(EventWriter::<E> { queue: vec![] });
-
-        self.registered_events
-            .as_mut()
-            .unwrap()
-            .push(RegisteredEvent {
-                id: TypeId::of::<EventWriter<E>>(),
-                update: |rec, id| {
-                    let mut writer = rec.get(&id).unwrap().borrow_mut();
-                    let writer = writer.downcast_mut::<EventWriter<E>>().unwrap();
-
-                    writer.send_to_reader(&rec);
-                },
-            });
-    }
-
-    pub fn build_with_clock<const CLOCK: u32>(&mut self) -> TaskRunner<CLOCK> {
-        for task in self.startup_tasks.iter_mut() {
-            task.invoke(&self.resources.as_ref().unwrap());
-        }
-
-        let clock = SystemClock::default();
-        let start = clock.try_now().expect("Error can't start clock");
-        self.add_resource(clock);
-
-        TaskRunner {
-            tasks: self.update_tasks.take().unwrap(),
-            resources: self.resources.take().unwrap(),
-
-            registered_events: self.registered_events.take().unwrap(),
-            registered_states: self.registered_states.take().unwrap(),
-            registered_transitions: self.registered_transitions.take().unwrap(),
-
-            start_timestamp: start,
-        }
-    }
-
-    /// Builds a `TaskRunner` from the scheduler by invoking all startup tasks and preparing update tasks.
-    ///
-    /// # Parameters
-    ///
-    /// * `self` - A mutable reference to the `Scheduler` instance.
-    ///
-    /// # Returns
-    ///
-    /// * A `TaskRunner` that can execute scheduled tasks based on their timing.
-    #[cfg(feature = "std")]
-    pub fn build(&mut self) -> TaskRunner<0> {
-        self.build_with_clock()
     }
 }
