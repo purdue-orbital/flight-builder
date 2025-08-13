@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["on_enter","on_exit","on_transition"],"struct":["Transition"]};

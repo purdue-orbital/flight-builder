@@ -1,0 +1,3 @@
+var srcIndex = new Map(JSON.parse('[["flight_builder",["",[["clock",[],["mod.rs","std.rs"]],["events",[],["mod.rs","reader.rs","writer.rs"]],["map",[],["heap_sort.rs","mod.rs"]],["query",[],["mod.rs","res.rs","res_mut.rs"]],["scheduler",[["add",[],["event.rs","mod.rs","plugin.rs","resource.rs","state.rs","task.rs"]],["schedule",[],["mod.rs","per_a_tick.rs","startup.rs","update.rs"]]],["build.rs","mod.rs","runner.rs"]],["states",[["transition",[],["mod.rs","on_enter.rs","on_exit.rs","on_transition.rs"]]],["mod.rs","state_transition_event.rs"]],["tasks",[["task_param",[],["mod.rs","res.rs","res_mut.rs"]]],["function_task.rs","into_task.rs","mod.rs","stored_task.rs","task.rs"]]],["lib.rs"]]]]'));
+createSrcSidebar();
+//{"start":36,"fragment_lengths":[661]}
