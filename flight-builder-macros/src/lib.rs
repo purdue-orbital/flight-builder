@@ -3,9 +3,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::Data;
 use syn::DeriveInput;
-use syn::Fields;
 use syn::parse_macro_input;
 
 #[proc_macro_derive(States)]

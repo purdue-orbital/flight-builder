@@ -1,41 +1,17 @@
+use cortex_m::peripheral::SYST;
+use cortex_m::interrupt::{Mutex, free};
+use defmt::println;
+use core::cell::Cell;
+use core::sync::atomic::{AtomicU32, Ordering};
 use embedded_time::Clock;
 
-#[cfg(feature = "std")]
-extern crate std;
-
-#[cfg(feature = "std")]
-use std::time::Instant;
-
-#[cfg(feature = "cortex-m")]
-use cortex_m::peripheral::SYST;
-
-#[cfg(feature = "cortex-m")]
-use cortex_m::interrupt::{Mutex, free};
-
-#[cfg(feature = "cortex-m")]
-use defmt::println;
-
-#[cfg(feature = "cortex-m")]
-use core::cell::Cell;
-
-#[cfg(feature = "cortex-m")]
-use core::sync::atomic::{AtomicU32, Ordering};
-
-#[cfg(feature = "cortex-m")]
 static MS_LOWER_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
-
-#[cfg(feature = "cortex-m")]
 static MS_UPPER_COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
 
 pub struct SystemClock<const CLOCK: u32> {
-    #[cfg(feature = "std")]
-    start: Instant,
-
-    #[cfg(feature = "cortex-m")]
     syst: cortex_m::peripheral::SYST,
 }
 
-#[cfg(feature = "cortex-m")]
 #[cortex_m_rt::exception]
 fn SysTick() {
     free(|cs| {
@@ -49,16 +25,6 @@ fn SysTick() {
     })
 }
 
-#[cfg(feature = "std")]
-impl<const CLOCK: u32> Default for SystemClock<CLOCK> {
-    fn default() -> SystemClock<CLOCK> {
-        SystemClock {
-            start: Instant::now(),
-        }
-    }
-}
-
-#[cfg(feature = "cortex-m")]
 impl<const CLOCK: u32> Default for SystemClock<CLOCK> {
     fn default() -> SystemClock<CLOCK> {
         let c = cortex_m::Peripherals::take().unwrap();
@@ -74,20 +40,6 @@ impl<const CLOCK: u32> Default for SystemClock<CLOCK> {
     }
 }
 
-#[cfg(feature = "std")]
-impl<const CLOCK: u32> Clock for SystemClock<CLOCK> {
-    type T = u64;
-    const SCALING_FACTOR: embedded_time::rate::Fraction =
-        embedded_time::rate::Fraction::new(1, 1_000_000);
-
-    fn try_now(&self) -> Result<embedded_time::Instant<Self>, embedded_time::clock::Error> {
-        Ok(embedded_time::Instant::new(
-            (Instant::now() - self.start).as_micros() as u64,
-        ))
-    }
-}
-
-#[cfg(feature = "cortex-m")]
 impl<const CLOCK: u32> Clock for SystemClock<CLOCK> {
     type T = u64;
     const SCALING_FACTOR: embedded_time::rate::Fraction =

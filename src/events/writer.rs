@@ -1,26 +1,11 @@
-use super::map::Map as HashMap;
-use super::scheduler::MAX_RESOURCES;
-use alloc::boxed::Box;
 use alloc::vec::Vec;
+use crate::map::Map as HashMap;
+use crate::scheduler::MAX_RESOURCES;
+use alloc::boxed::Box;
 use core::any::{Any, TypeId};
 use core::cell::RefCell;
-
-pub trait Event {}
-
-pub struct RegisteredEvent {
-    pub(super) id: TypeId,
-    pub(super) update: fn(&HashMap<TypeId, RefCell<Box<dyn Any>>, MAX_RESOURCES>, TypeId),
-}
-
-pub struct EventReader<S: Event> {
-    pub(crate) queue: Vec<S>,
-}
-
-impl<E: Event> EventReader<E> {
-    pub fn iter(&self) -> alloc::slice::Iter<'_, E> {
-        self.queue.iter()
-    }
-}
+use super::Event;
+use super::reader::EventReader;
 
 #[derive(Default, PartialEq, Eq)]
 pub struct EventWriter<S: Event> {

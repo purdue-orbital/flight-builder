@@ -1,25 +1,13 @@
 use alloc::boxed::Box;
 use core::any::Any;
-use core::cell::{Ref, RefMut};
+use core::cell::{RefMut};
 use core::marker::PhantomData;
-use core::ops::{Deref, DerefMut};
-
-pub struct Res<'a, T: 'static> {
-    pub(crate) value: Ref<'a, Box<dyn Any>>,
-    pub(crate) _marker: PhantomData<&'a T>,
-}
+use core::ops::{Deref};
+use core::ops::{DerefMut};
 
 pub struct ResMut<'a, T: 'static> {
     pub(crate) value: RefMut<'a, Box<dyn Any>>,
     pub(crate) _marker: PhantomData<&'a mut T>,
-}
-
-impl<T> Deref for Res<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        self.value.downcast_ref().unwrap()
-    }
 }
 
 impl<T> Deref for ResMut<'_, T> {
